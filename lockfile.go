@@ -1,4 +1,4 @@
-// Handle filename based locking.
+// Handle pid file based locking.
 package lockfile
 
 import (
@@ -13,7 +13,7 @@ import (
 type Lockfile string
 
 var (
-	ErrBusy        = errors.New("Locked by other process")
+	ErrBusy        = errors.New("Locked by other process") // If you get this, retry after a short sleep might help
 	ErrNeedAbsPath = errors.New("Lockfiles must be given as absolute path names")
 )
 
@@ -40,9 +40,9 @@ func New(path string) (Lockfile, error) {
 func (l Lockfile) TryLock() error {
 	name := string(l)
 
-	// This has been checked by New already. If we trigger here, 
-        // the caller didn't use New and re-implemented it's functionality badly. 
-        // So panic, that he might find this easily during testing.
+	// This has been checked by New already. If we trigger here,
+	// the caller didn't use New and re-implemented it's functionality badly.
+	// So panic, that he might find this easily during testing.
 	if !filepath.IsAbs(string(name)) {
 		panic(ErrNeedAbsPath)
 	}
@@ -107,7 +107,7 @@ func (l Lockfile) TryLock() error {
 	return l.TryLock()
 }
 
-// Release a lock again. Returns any error that happend during release
+// Release a lock again. Returns any error that happend during release of lock.
 func (l Lockfile) Unlock() error {
 	return os.Remove(string(l))
 }

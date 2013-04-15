@@ -1,6 +1,6 @@
 lockfile
 =========
-Handle locking via pid files
+Handle locking via pid files.
 
 [![Build Status][1]][2]
 
