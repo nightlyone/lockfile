@@ -1,12 +1,11 @@
-package lockfile_test
+package lockfile
 
 import (
 	"fmt"
-	"github.com/nightlyone/lockfile"
 )
 
 func ExampleLockfile() {
-	lock, err := lockfile.New("/tmp/lock.me.now.lck")
+	lock, err := New("/tmp/lock.me.now.lck")
 	if err != nil {
 		fmt.Println("Cannot init lock. reason: %v", err)
 		panic(err)
