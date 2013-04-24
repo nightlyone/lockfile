@@ -15,16 +15,9 @@ type Lockfile string
 var (
 	ErrBusy        = errors.New("Locked by other process") // If you get this, retry after a short sleep might help
 	ErrNeedAbsPath = errors.New("Lockfiles must be given as absolute path names")
+	ErrInvalidPid  = errors.New("Lockfile contains invalid pid for system")
+	ErrDeadOwner   = errors.New("Lockfile contains pid of process not existent on this system anymore")
 )
-
-// ugly workaround, because os.FindProcess() is crap
-func findProcess(pid int) error {
-	p, err := os.FindProcess(pid)
-	if err != nil {
-		return err
-	}
-	return p.Signal(os.Signal(syscall.Signal(0)))
-}
 
 // Describe a new filename located at path. It is expected to be an absolute path
 func New(path string) (Lockfile, error) {
@@ -32,6 +25,51 @@ func New(path string) (Lockfile, error) {
 		return Lockfile(""), ErrNeedAbsPath
 	}
 	return Lockfile(path), nil
+}
+
+// Who owns the lockfile?
+func (l Lockfile) GetOwner() (*os.Process, error) {
+	name := string(l)
+
+	// Ok, see, if we have a stale lockfile here
+	content, err := ioutil.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
+
+	var pid int
+	_, err = fmt.Sscanln(string(content), &pid)
+	if err != nil {
+		return nil, err
+	}
+
+	// try hard for pids. If no pid, the lockfile is junk anyway and we delete it.
+	if pid > 0 {
+		p, err := os.FindProcess(pid)
+		if err != nil {
+			return nil, err
+		}
+		err = p.Signal(os.Signal(syscall.Signal(0)))
+		if err == nil {
+			return p, nil
+		}
+		errno, ok := err.(syscall.Errno)
+		if !ok {
+			return nil, err
+		}
+
+		switch errno {
+		case syscall.ESRCH:
+			return nil, ErrDeadOwner
+		case syscall.EPERM:
+			return p, nil
+		default:
+			return nil, err
+		}
+	} else {
+		return nil, ErrInvalidPid
+	}
+	panic("Not reached")
 }
 
 // Try to get Lockfile lock. Returns nil, if successful and and error describing the reason, it didn't work out.
@@ -77,24 +115,15 @@ func (l Lockfile) TryLock() error {
 		return nil
 	}
 
-	// Ok, see, if we have a stale lockfile here
-	content, err := ioutil.ReadFile(name)
-
-	var pid int
-	_, err = fmt.Sscanln(string(content), &pid)
-	if err != nil {
+	_, err = l.GetOwner()
+	switch err {
+	default:
+		// Other errors -> defensively fail and let caller handle this
 		return err
-	}
-
-	// try hard for pids. If no pid, the lockfile is junk anyway and we delete it.
-	if pid != 0 {
-		err = findProcess(pid)
-		if err == nil {
-			return ErrBusy
-		}
-		if errno, ok := err.(syscall.Errno); ok && errno != syscall.ESRCH {
-			return ErrBusy
-		}
+	case nil:
+		return ErrBusy
+	case ErrDeadOwner, ErrInvalidPid:
+		// cases we can fix below
 	}
 
 	// clean stale/invalid lockfile
