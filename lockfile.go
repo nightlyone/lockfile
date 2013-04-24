@@ -33,6 +33,9 @@ func (l Lockfile) GetOwner() (*os.Process, error) {
 
 	// Ok, see, if we have a stale lockfile here
 	content, err := ioutil.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
 
 	var pid int
 	_, err = fmt.Sscanln(string(content), &pid)
