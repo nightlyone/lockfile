@@ -40,7 +40,7 @@ func (l Lockfile) GetOwner() (*os.Process, error) {
 	var pid int
 	_, err = fmt.Sscanln(string(content), &pid)
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidPid
 	}
 
 	// try hard for pids. If no pid, the lockfile is junk anyway and we delete it.
