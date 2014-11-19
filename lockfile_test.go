@@ -9,7 +9,9 @@ import (
 )
 
 func ExampleLockfile() {
-	lock, err := New("/tmp/lock.me.now.lck")
+
+	file := filepath.Join(os.TempDir(), "lock.me.now.lck")
+	lock, err := New(file)
 	if err != nil {
 		fmt.Println("Cannot init lock. reason: %v", err)
 		panic(err)
@@ -30,19 +32,20 @@ func ExampleLockfile() {
 
 func SimpleLockTest(t *testing.T) {
 
-	temp := os.TempDir()
-	file := filepath.Join(temp, "lock.me.test")
+	//create the lock
+	file := filepath.Join(os.TempDir(), "lock.me.test")
 	lock, err := New(file)
-
 	if err != nil {
 		t.Error(err)
 	}
 
+	//aquire the lock
 	err = lock.TryLock()
 	if err != nil {
 		t.Error(err)
 	}
 
+	//close the lock
 	defer func() {
 		err = lock.Unlock()
 		if err != nil {
@@ -53,23 +56,26 @@ func SimpleLockTest(t *testing.T) {
 
 func TestBadLock(t *testing.T) {
 
-	temp := os.TempDir()
-	file := filepath.Join(temp, "lock.me.test")
+	file := filepath.Join(os.TempDir(), "lock.me.test")
+
+	//write junk to the lock file
 	if err := ioutil.WriteFile(file, []byte("asdf"), os.ModePerm); err != nil {
 		t.Error(err)
 	}
 
+	//create the lock obj
 	lock, err := New(file)
-
 	if err != nil {
 		t.Error(err)
 	}
 
+	//we expect this to detect its a bogus lock and aquire the lock anyway
 	err = lock.TryLock()
 	if err != nil {
 		t.Error(err)
 	}
 
+	//succesfully close the lock
 	defer func() {
 		err = lock.Unlock()
 		if err != nil {
@@ -80,19 +86,20 @@ func TestBadLock(t *testing.T) {
 
 func TestConcurrentAccess(t *testing.T) {
 
-	temp := os.TempDir()
-	file := filepath.Join(temp, "lock.me.test")
+	//create the lock obj
+	file := filepath.Join(os.TempDir(), "lock.me.test")
 	lock, err := New(file)
-
 	if err != nil {
 		t.Error(err)
 	}
 
+	//aquire the lock
 	err = lock.TryLock()
 	if err != nil {
 		t.Error(err)
 	}
 
+	//defer close the lock
 	defer func() {
 		err = lock.Unlock()
 		if err != nil {
@@ -100,13 +107,15 @@ func TestConcurrentAccess(t *testing.T) {
 		}
 	}()
 
+	//create another lock pointed to the same file
 	lock2, err := New(file)
 	if err != nil {
 		t.Error(err)
 	}
 
+	//try to aquire the same lock, we expect this to fail
 	err = lock2.TryLock()
-	if err == nil {
-		t.Error("expected lock to fail")
+	if err != ErrBusy {
+		t.Error("expected lock to fail with ErrBusy")
 	}
 }
