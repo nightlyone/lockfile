@@ -30,7 +30,7 @@ func ExampleLockfile() {
 	// Output: Do stuff under lock
 }
 
-func SimpleLockTest(t *testing.T) {
+func TestSimpleLock(t *testing.T) {
 
 	//create the lock
 	file := filepath.Join(os.TempDir(), "lock.me.test")
@@ -46,12 +46,10 @@ func SimpleLockTest(t *testing.T) {
 	}
 
 	//close the lock
-	defer func() {
-		err = lock.Unlock()
-		if err != nil {
-			t.Error(err)
-		}
-	}()
+	err = lock.Unlock()
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestBadLock(t *testing.T) {
@@ -76,12 +74,10 @@ func TestBadLock(t *testing.T) {
 	}
 
 	//succesfully close the lock
-	defer func() {
-		err = lock.Unlock()
-		if err != nil {
-			t.Error(err)
-		}
-	}()
+	err = lock.Unlock()
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestConcurrentAccess(t *testing.T) {
