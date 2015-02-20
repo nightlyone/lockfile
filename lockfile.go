@@ -55,7 +55,7 @@ func (l Lockfile) GetOwner() (*os.Process, error) {
 		}
 		errno, ok := err.(syscall.Errno)
 		if !ok {
-			return nil, err
+			return nil, ErrDeadOwner
 		}
 
 		switch errno {
