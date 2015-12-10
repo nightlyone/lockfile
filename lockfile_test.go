@@ -3,10 +3,12 @@ package lockfile_test
 import (
 	lockfile "."
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
 func ExampleLockfile() {
-	lock, err := lockfile.New("/tmp/lock.me.now.lck")
+	lock, err := lockfile.New(filepath.Join(os.TempDir(), "lock.me.now.lck"))
 	if err != nil {
 		fmt.Println("Cannot init lock. reason: %v", err)
 		panic(err)
