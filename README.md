@@ -12,6 +12,7 @@ Handle locking via pid files.
 install
 -------
 Install [Go 1][3], either [from source][4] or [with a prepackaged binary][5].
+For Windows suport, Go 1.4 or newer is required.
 
 Then run
 
