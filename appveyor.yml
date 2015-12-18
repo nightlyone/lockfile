@@ -1,4 +1,4 @@
-clone_folder: c:\gopath\src\github.com\Acconut\lockfile
+clone_folder: c:\gopath\src\github.com\nightlyone\lockfile
 
 environment:
   GOPATH: c:\gopath
