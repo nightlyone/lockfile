@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"syscall"
 )
 
 type Lockfile string
@@ -49,23 +48,7 @@ func (l Lockfile) GetOwner() (*os.Process, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = p.Signal(os.Signal(syscall.Signal(0)))
-		if err == nil {
-			return p, nil
-		}
-		errno, ok := err.(syscall.Errno)
-		if !ok {
-			return nil, ErrDeadOwner
-		}
-
-		switch errno {
-		case syscall.ESRCH:
-			return nil, ErrDeadOwner
-		case syscall.EPERM:
-			return p, nil
-		default:
-			return nil, err
-		}
+		return p, isProcessAlive(p)
 	} else {
 		return nil, ErrInvalidPid
 	}
