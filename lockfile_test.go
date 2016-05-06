@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestSimpleLock(t *testing.T) {
+func TestLock(t *testing.T) {
 	path, err := filepath.Abs("test_lockfile.pid")
 	if err != nil {
 		panic(err)
@@ -60,5 +60,53 @@ func GetDeadPID() int {
 		if !running {
 			return pid
 		}
+	}
+}
+
+func TestBusy(t *testing.T) {
+	path, err := filepath.Abs("test_lockfile.pid")
+	if err != nil {
+		t.Fail()
+		fmt.Println(err)
+		return
+	}
+
+	lf1, err := New(path)
+	if err != nil {
+		t.Fail()
+		fmt.Println(err)
+		return
+	}
+
+	err = lf1.TryLock()
+	if err != nil {
+		t.Fail()
+		fmt.Println(err)
+		return
+	}
+
+	lf2, err := New(path)
+	if err != nil {
+		t.Fail()
+		fmt.Println(err)
+		return
+	}
+
+	err = lf2.TryLock()
+	if err == nil {
+		t.Fail()
+		fmt.Println("No error locking already locked lockfile!")
+		return
+	} else if err != ErrBusy {
+		t.Fail()
+		fmt.Println(err)
+		return
+	}
+
+	err = lf1.Unlock()
+	if err != nil {
+		t.Fail()
+		fmt.Println(err)
+		return
 	}
 }
