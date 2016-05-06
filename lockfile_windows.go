@@ -1,32 +1,24 @@
 package lockfile
 
 import (
-	"os"
-	"reflect"
 	"syscall"
 )
 
-func isProcessAlive(p *os.Process) error {
-	// Extract handle value from the os.Process struct to avoid the need
-	// of a second, manually opened process handle.
-	value := reflect.ValueOf(p)
-	// Dereference *os.Process to os.Process
-	value = value.Elem()
-	field := value.FieldByName("handle")
-
-	handle := syscall.Handle(field.Uint())
+func isRunning(pid int) (bool, error) {
+	procHnd, err := syscall.OpenProcess(syscall.PROCESS_QUERY_INFORMATION, true, uint32(pid))
+	if err != nil {
+		if scerr, ok := err.(syscall.Errno); ok {
+			if uintptr(scerr) == 87 {
+				return false, nil //I only have a vague idea why this error occurs. I'm pretty sure it only occurs when the process isn't running #WindowsIsAPain
+			}
+		}
+	}
 
 	var code uint32
-	err := syscall.GetExitCodeProcess(handle, &code)
+	err = syscall.GetExitCodeProcess(procHnd, &code)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	// code will contain the exit code of the process or 259 (STILL_ALIVE)
-	// if the process has not exited yet.
-	if code == 259 {
-		return nil
-	}
-
-	return ErrDeadOwner
+	return code == 259, nil
 }

@@ -44,11 +44,21 @@ func (l Lockfile) GetOwner() (*os.Process, error) {
 
 	// try hard for pids. If no pid, the lockfile is junk anyway and we delete it.
 	if pid > 0 {
-		p, err := os.FindProcess(pid)
+		running, err := isRunning(pid)
 		if err != nil {
 			return nil, err
 		}
-		return p, isProcessAlive(p)
+
+		if running {
+			proc, err := os.FindProcess(pid)
+			if err != nil {
+				return nil, err
+			}
+			return proc, nil
+		} else {
+			return nil, ErrDeadOwner
+		}
+
 	} else {
 		return nil, ErrInvalidPid
 	}
