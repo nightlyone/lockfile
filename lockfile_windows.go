@@ -4,12 +4,18 @@ import (
 	"syscall"
 )
 
+//For some reason these consts don't exist in syscall.
+const (
+	error_invalid_parameter = 87
+	code_still_active       = 259
+)
+
 func isRunning(pid int) (bool, error) {
 	procHnd, err := syscall.OpenProcess(syscall.PROCESS_QUERY_INFORMATION, true, uint32(pid))
 	if err != nil {
 		if scerr, ok := err.(syscall.Errno); ok {
-			if uintptr(scerr) == 87 {
-				return false, nil //I only have a vague idea why this error occurs. I'm pretty sure it only occurs when the process isn't running #WindowsIsAPain
+			if uintptr(scerr) == error_invalid_parameter {
+				return false, nil
 			}
 		}
 	}
@@ -20,5 +26,5 @@ func isRunning(pid int) (bool, error) {
 		return false, err
 	}
 
-	return code == 259, nil
+	return code == code_still_active, nil
 }
