@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"syscall"
 )
 
 type Lockfile string
@@ -48,8 +49,9 @@ func (l Lockfile) GetOwner() (*os.Process, error) {
 		p, err := os.FindProcess(pid)
 		if err != nil {
 			//os.FindProcess is only defined to always succeeds on Unix systems.
-			//On windows it will fail when process does not exit.
-			if runtime.GOOS == "windows" {
+			//On windows errno is 87 when process does not exit.
+			sysErr, ok := err.(*os.SyscallError)
+			if ok && runtime.GOOS == "windows" && uintptr(sysErr.Err.(syscall.Errno)) == 87 {
 				return nil, ErrDeadOwner
 			}
 			return nil, err
