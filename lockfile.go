@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 type Lockfile string
@@ -46,6 +47,11 @@ func (l Lockfile) GetOwner() (*os.Process, error) {
 	if pid > 0 {
 		p, err := os.FindProcess(pid)
 		if err != nil {
+			//os.FindProcess is only defined to always succeeds on Unix systems.
+			//On windows it will fail when process does not exit.
+			if runtime.GOOS == "windows" {
+				return nil, ErrDeadOwner
+			}
 			return nil, err
 		}
 		return p, isProcessAlive(p)
