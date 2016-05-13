@@ -4,10 +4,31 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
 )
+
+func ExampleLockfile() {
+	lock, err := New(filepath.Join(os.TempDir(), "lock.me.now.lck"))
+	if err != nil {
+		fmt.Printf("Cannot init lock. reason: %v\n", err)
+		panic(err)
+	}
+	err = lock.TryLock()
+
+	// Error handling is essential, as we only try to get the lock.
+	if err != nil {
+		fmt.Printf("Cannot lock \"%v\", reason: %v\n", lock, err)
+		panic(err)
+	}
+
+	defer lock.Unlock()
+
+	fmt.Println("Do stuff under lock")
+	// Output: Do stuff under lock
+}
 
 func TestLock(t *testing.T) {
 	path, err := filepath.Abs("test_lockfile.pid")
