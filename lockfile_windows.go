@@ -1,32 +1,30 @@
 package lockfile
 
 import (
-	"os"
-	"reflect"
 	"syscall"
 )
 
-func isProcessAlive(p *os.Process) error {
-	// Extract handle value from the os.Process struct to avoid the need
-	// of a second, manually opened process handle.
-	value := reflect.ValueOf(p)
-	// Dereference *os.Process to os.Process
-	value = value.Elem()
-	field := value.FieldByName("handle")
+//For some reason these consts don't exist in syscall.
+const (
+	error_invalid_parameter = 87
+	code_still_active       = 259
+)
 
-	handle := syscall.Handle(field.Uint())
+func isRunning(pid int) (bool, error) {
+	procHnd, err := syscall.OpenProcess(syscall.PROCESS_QUERY_INFORMATION, true, uint32(pid))
+	if err != nil {
+		if scerr, ok := err.(syscall.Errno); ok {
+			if uintptr(scerr) == error_invalid_parameter {
+				return false, nil
+			}
+		}
+	}
 
 	var code uint32
-	err := syscall.GetExitCodeProcess(handle, &code)
+	err = syscall.GetExitCodeProcess(procHnd, &code)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	// code will contain the exit code of the process or 259 (STILL_ALIVE)
-	// if the process has not exited yet.
-	if code == 259 {
-		return nil
-	}
-
-	return ErrDeadOwner
+	return code == code_still_active, nil
 }
