@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Lockfile string
@@ -17,6 +18,8 @@ var (
 	ErrInvalidPid  = errors.New("Lockfile contains invalid pid for system")
 	ErrDeadOwner   = errors.New("Lockfile contains pid of process not existent on this system anymore")
 )
+
+func isNoFileErr(err error) bool { return strings.Contains(err.Error(), "no such file or directory") }
 
 // Describe a new filename located at path. It is expected to be an absolute path
 func New(path string) (Lockfile, error) {
@@ -100,6 +103,9 @@ func (l Lockfile) TryLock() error {
 	}
 	fiLock, err := os.Lstat(name)
 	if err != nil {
+		if isNoFileErr(err) {
+			return l.TryLock()
+		}
 		return err
 	}
 
@@ -112,6 +118,9 @@ func (l Lockfile) TryLock() error {
 	switch err {
 	default:
 		// Other errors -> defensively fail and let caller handle this
+		if isNoFileErr(err) {
+			return l.TryLock()
+		}
 		return err
 	case nil:
 		return ErrBusy
@@ -121,7 +130,7 @@ func (l Lockfile) TryLock() error {
 
 	// clean stale/invalid lockfile
 	err = os.Remove(name)
-	if err != nil {
+	if err != nil && !isNoFileErr(err) {
 		return err
 	}
 
