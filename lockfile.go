@@ -13,6 +13,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
+	"syscall"
 )
 
 // Lockfile is a pid file which can be locked
@@ -71,6 +73,12 @@ func (l Lockfile) GetOwner() (*os.Process, error) {
 	if running {
 		proc, err := os.FindProcess(pid)
 		if err != nil {
+			//os.FindProcess is only defined to always succeeds on Unix systems.
+			//On windows errno is 87 when process does not exist.
+			sysErr, ok := err.(*os.SyscallError)
+			if ok && runtime.GOOS == "windows" && uintptr(sysErr.Err.(syscall.Errno)) == 87 {
+				return nil, ErrDeadOwner
+			}
 			return nil, err
 		}
 		return proc, nil
