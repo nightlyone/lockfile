@@ -16,7 +16,10 @@ import (
 )
 
 // Lockfile is a pid file which can be locked
-type Lockfile string
+type Lockfile struct {
+	path      string
+	recursive bool
+}
 
 // TemporaryError is a type of error where a retry after a random amount of sleep should help to mitigate it.
 type TemporaryError string
@@ -41,19 +44,28 @@ var (
 )
 
 // New describes a new filename located at the given absolute path.
-func New(path string) (Lockfile, error) {
-	if !filepath.IsAbs(path) {
-		return Lockfile(""), ErrNeedAbsPath
+func New(path string, recursive ...bool) (l Lockfile, err error) {
+	l.path = path
+	l.recursive = true
+	if len(recursive) > 0 {
+		l.recursive = recursive[0]
 	}
-	return Lockfile(path), nil
+	if !filepath.IsAbs(path) {
+		l.path = ""
+		err = ErrNeedAbsPath
+	}
+	return l, err
+}
+
+// IsRecursive returns true if it's a recursive lock.
+func (l Lockfile) IsRecursive() bool {
+	return l.recursive
 }
 
 // GetOwner returns who owns the lockfile.
 func (l Lockfile) GetOwner() (*os.Process, error) {
-	name := string(l)
-
 	// Ok, see, if we have a stale lockfile here
-	content, err := ioutil.ReadFile(name)
+	content, err := ioutil.ReadFile(l.path)
 	if err != nil {
 		return nil, err
 	}
@@ -84,16 +96,14 @@ func (l Lockfile) GetOwner() (*os.Process, error) {
 // Please note, that existing lockfiles containing pids of dead processes
 // and lockfiles containing no pid at all are simply deleted.
 func (l Lockfile) TryLock() error {
-	name := string(l)
-
 	// This has been checked by New already. If we trigger here,
 	// the caller didn't use New and re-implemented it's functionality badly.
 	// So panic, that he might find this easily during testing.
-	if !filepath.IsAbs(name) {
+	if !filepath.IsAbs(l.path) {
 		panic(ErrNeedAbsPath)
 	}
 
-	tmplock, err := ioutil.TempFile(filepath.Dir(name), filepath.Base(name)+".")
+	tmplock, err := ioutil.TempFile(filepath.Dir(l.path), filepath.Base(l.path)+".")
 	if err != nil {
 		return err
 	}
@@ -115,7 +125,7 @@ func (l Lockfile) TryLock() error {
 	// We cannot ignore ALL errors, since failure to support hard links, disk full
 	// as well as many other errors can happen to a filesystem operation
 	// and we really want to abort on those.
-	if err := os.Link(tmplock.Name(), name); err != nil {
+	if err := os.Link(tmplock.Name(), l.path); err != nil {
 		if !os.IsExist(err) {
 			return err
 		}
@@ -125,7 +135,7 @@ func (l Lockfile) TryLock() error {
 	if err != nil {
 		return err
 	}
-	fiLock, err := os.Lstat(name)
+	fiLock, err := os.Lstat(l.path)
 	if err != nil {
 		// tell user that a retry would be a good idea
 		if os.IsNotExist(err) {
@@ -145,7 +155,7 @@ func (l Lockfile) TryLock() error {
 		// Other errors -> defensively fail and let caller handle this
 		return err
 	case nil:
-		if proc.Pid != os.Getpid() {
+		if proc.Pid != os.Getpid() || !l.IsRecursive() {
 			return ErrBusy
 		}
 	case ErrDeadOwner, ErrInvalidPid:
@@ -153,7 +163,7 @@ func (l Lockfile) TryLock() error {
 	}
 
 	// clean stale/invalid lockfile
-	err = os.Remove(name)
+	err = os.Remove(l.path)
 	if err != nil {
 		// If it doesn't exist, then it doesn't matter who removed it.
 		if !os.IsNotExist(err) {
@@ -174,7 +184,7 @@ func (l Lockfile) Unlock() error {
 	case nil:
 		if proc.Pid == os.Getpid() {
 			// we really own it, so let's remove it.
-			return os.Remove(string(l))
+			return os.Remove(l.path)
 		}
 		// Not owned by me, so don't delete it.
 		return ErrRogueDeletion
