@@ -43,6 +43,10 @@ func TestBasicLockUnlock(t *testing.T) {
 		return
 	}
 
+	if lf.IsRecursive() != true {
+		t.Fatal("lockfile should be recursive but isn't")
+	}
+
 	err = lf.TryLock()
 	if err != nil {
 		t.Fail()
@@ -304,5 +308,41 @@ func TestScanPidLine(t *testing.T) {
 		if got != want {
 			t.Errorf("%d: expected error %v, got %v", step, want, got)
 		}
+	}
+}
+
+func TestNonRecursiveLock(t *testing.T) {
+	path, err := filepath.Abs("test_lockfile.pid")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lf, err := New(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if lf.IsRecursive() == true {
+		t.Fatal("lockfile shouldn't be recursive but it is")
+	}
+
+	if err := lf.TryLock(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := lf.TryLock(); err == nil {
+		t.Fatal("non-recursive lock: TryLock() should have failed")
+	}
+
+	if err := lf.Unlock(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := lf.TryLock(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := lf.Unlock(); err != nil {
+		t.Fatal(err)
 	}
 }
