@@ -111,7 +111,7 @@ func (l Lockfile) TryLock() error {
 	// EEXIST and similiar error codes, caught by os.IsExist, are intentionally ignored,
 	// as it means that someone was faster creating this link
 	// and ignoring this kind of error is part of the algorithm.
-	// The we will probably fail the pid owner check later, if this process is still alive.
+	// Then we will probably fail the pid owner check later, if this process is still alive.
 	// We cannot ignore ALL errors, since failure to support hard links, disk full
 	// as well as many other errors can happen to a filesystem operation
 	// and we really want to abort on those.
