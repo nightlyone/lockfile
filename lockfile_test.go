@@ -16,15 +16,19 @@ func ExampleLockfile() {
 		fmt.Printf("Cannot init lock. reason: %v", err)
 		panic(err) // handle properly please!
 	}
-	err = lock.TryLock()
 
 	// Error handling is essential, as we only try to get the lock.
-	if err != nil {
+	if err = lock.TryLock(); err != nil {
 		fmt.Printf("Cannot lock %q, reason: %v", lock, err)
 		panic(err) // handle properly please!
 	}
 
-	defer lock.Unlock()
+	defer func() {
+		if err := lock.Unlock(); err != nil {
+			fmt.Printf("Cannot unlock %q, reason: %v", lock, err)
+			panic(err) // handle properly please!
+		}
+	}()
 
 	fmt.Println("Do stuff under lock")
 	// Output: Do stuff under lock
@@ -61,7 +65,6 @@ func TestBasicLockUnlock(t *testing.T) {
 func GetDeadPID() int {
 	// I have no idea how windows handles large PIDs, or if they even exist.
 	// So limit it to be less or equal to 4096 to be safe.
-
 	const maxPid = 4095
 
 	// limited iteration, so we finish one day
@@ -71,7 +74,9 @@ func GetDeadPID() int {
 		if seen[pid] {
 			continue
 		}
+
 		seen[pid] = true
+
 		running, err := isRunning(pid)
 		if err != nil {
 			fmt.Println("Error checking PID: ", err)
@@ -164,6 +169,7 @@ func TestRogueDeletionDeadPid(t *testing.T) {
 		t.Fatal(err)
 		return
 	}
+
 	defer os.Remove(path)
 
 	err = lf.Unlock()
@@ -172,12 +178,12 @@ func TestRogueDeletionDeadPid(t *testing.T) {
 		return
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		t.Fatal("lockfile should not be deleted by us, if we didn't create it")
-	} else {
-		if err != nil {
-			t.Fatalf("unexpected error %v", err)
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			content, _ := ioutil.ReadFile(path)
+			t.Fatalf("lockfile %q (%q) should not be deleted by us, if we didn't create it", path, content)
 		}
+		t.Fatalf("unexpected error %v", err)
 	}
 }
 
@@ -215,10 +221,12 @@ func TestInvalidPidLeadToReplacedLockfileAndSuccess(t *testing.T) {
 		t.Fatal(err)
 		return
 	}
+
 	if err := ioutil.WriteFile(path, []byte("\n"), 0666); err != nil {
 		t.Fatal(err)
 		return
 	}
+
 	defer os.Remove(path)
 
 	lf, err := New(path)
@@ -250,33 +258,13 @@ func TestScanPidLine(t *testing.T) {
 		pid   int
 		xfail error
 	}{
-		{
-			xfail: ErrInvalidPid,
-		},
-		{
-			input: []byte(""),
-			xfail: ErrInvalidPid,
-		},
-		{
-			input: []byte("\n"),
-			xfail: ErrInvalidPid,
-		},
-		{
-			input: []byte("-1\n"),
-			xfail: ErrInvalidPid,
-		},
-		{
-			input: []byte("0\n"),
-			xfail: ErrInvalidPid,
-		},
-		{
-			input: []byte("a\n"),
-			xfail: ErrInvalidPid,
-		},
-		{
-			input: []byte("1\n"),
-			pid:   1,
-		},
+		{xfail: ErrInvalidPid},
+		{input: []byte(""), xfail: ErrInvalidPid},
+		{input: []byte("\n"), xfail: ErrInvalidPid},
+		{input: []byte("-1\n"), xfail: ErrInvalidPid},
+		{input: []byte("0\n"), xfail: ErrInvalidPid},
+		{input: []byte("a\n"), xfail: ErrInvalidPid},
+		{input: []byte("1\n"), pid: 1},
 	}
 
 	// test positive cases first
@@ -284,12 +272,13 @@ func TestScanPidLine(t *testing.T) {
 		if tc.xfail != nil {
 			continue
 		}
-		want := tc.pid
+
 		got, err := scanPidLine(tc.input)
 		if err != nil {
 			t.Fatalf("%d: unexpected error %v", step, err)
 		}
-		if got != want {
+
+		if want := tc.pid; got != want {
 			t.Errorf("%d: expected pid %d, got %d", step, want, got)
 		}
 	}
@@ -299,9 +288,9 @@ func TestScanPidLine(t *testing.T) {
 		if tc.xfail == nil {
 			continue
 		}
-		want := tc.xfail
+
 		_, got := scanPidLine(tc.input)
-		if got != want {
+		if want := tc.xfail; got != want {
 			t.Errorf("%d: expected error %v, got %v", step, want, got)
 		}
 	}
